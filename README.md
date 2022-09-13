@@ -1,4 +1,4 @@
-# Turborepo starter
+# Solidity TS
 
 This is an official pnpm starter turborepo.
 
