@@ -3,21 +3,56 @@ import expressionDefinitions from "./expressionMakers";
 import * as solidityParse from "@solidity-parser/parser"
 import { logInfo } from "./utils";
 
-export class TranspileToTS {
-    static TS(exp: any): string {
-        logInfo(exp)
+export interface ContractData {
+    [key: string]: {
+        mappingVariables: {
+            [key: string]: boolean
+        },
+        variables: {
+            [key: string]: boolean
+        }
+    }
+}
 
+export function TS(parent: TranspileToTS, exp: any): string {
+    const expFunc = expressionDefinitions[exp.type]
+
+    if (expFunc === undefined) {
+        throw new Error(`Expression unknown (${exp.type})`)
+    }
+
+    return expFunc(parent, exp)
+}
+
+export class TranspileToTS {
+
+    contractsData: ContractData = {}
+
+    currentContractName = ""
+
+    constructor() { }
+
+    static TS(parent: TranspileToTS, exp: any): string {
         const expFunc = expressionDefinitions[exp.type]
 
         if (expFunc === undefined) {
             throw new Error(`Expression unknown (${exp.type})`)
         }
 
-        return expFunc.call(TranspileToTS, exp)
+        return expFunc(parent, exp)
     }
 
-    static SolTS(exp: any): string {
-        return exp.children.map(this.TS).join(" ")
+    SolTS(exp: any): string {
+        return exp.children.map((data) => {
+
+            this.currentContractName = data.name
+
+            this.contractsData[data.name] = {
+                mappingVariables: {}, variables: {}
+            }
+
+            return TS(this, data)
+        }).join(" ")
     }
 }
 
@@ -30,6 +65,8 @@ class SolTS {
 
     #transpiledCode = ""
 
+    transpiler = new TranspileToTS()
+
     constructor(code: string) {
         this.#astTree = solidityParse.parse(code)
     }
@@ -37,7 +74,7 @@ class SolTS {
     transpile() {
         let _transpiled = this.#beforeHooks.join(' ')
 
-        _transpiled += TranspileToTS.SolTS(this.#astTree)
+        _transpiled += this.transpiler.SolTS(this.#astTree)
 
         _transpiled += this.#afterHooks.join(' ')
 

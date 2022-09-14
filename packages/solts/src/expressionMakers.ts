@@ -1,4 +1,5 @@
 import * as exp from "constants"
+import { TS } from "./main"
 import { ExpressionDefinitions } from "./type"
 import { logInfo } from "./utils"
 
@@ -18,37 +19,42 @@ function getTypeByName(name: string) {
 }
 
 const expressionDefinitions: ExpressionDefinitions = {
-    ["ContractDefinition"]: function (this, expr: any) {
-        return `class ${expr.name} { ${expr.subNodes.map(this.TS).join(" ")} }`
-    },
-    ["StateVariableDeclaration"]: function (this, expr: any) {
+    ["ContractDefinition"]: function (parent, expr: any) {
 
-
-        const initialValue = expr.initialValue === null ? "" : this.TS(expr.initialValue)
-
-        return `${expr.variables.map(this.TS).join(" ")} ${initialValue};`
+        return `class ${expr.name} { ${expr.subNodes.map((node) => TS(parent, node)).join(" ")} }`
     },
-    ["Block"]: function (this, expr: any) {
-        return `{ ${expr.statements.map(this.TS).join(" ")} }`
+    ["StateVariableDeclaration"]: function (parent, expr: any) {
+        const initialValue = expr.initialValue === null ? "" : TS(parent, expr.initialValue)
+
+        parent.contractsData[parent.currentContractName].variables[expr.variables[0].name] = true
+
+        return `${expr.variables.map((vars) => TS(parent, vars)).join(" ")} ${initialValue};`
     },
-    ["FunctionDefinition"]: function (this, expr: any) {
+    ["Block"]: function (parent, expr: any) {
+        return `{ ${expr.statements.map((stmnts) => TS(parent, stmnts)).join(" ")} }`
+    },
+    ["FunctionDefinition"]: function (parent, expr: any) {
         const funcName = expr.name === null ? "constructor" : expr.name
 
-        return `${funcName} (${expr.parameters.map((par: any) => `${par.name}`).join(",")}) ${this.TS(expr.body)}`
+        return `${funcName} (${expr.parameters.map((par: any) => `${par.name}`).join(",")}) ${TS(parent, expr.body)}`
     },
-    ["NumberLiteral"]: function (this, expr: any) {
+    ["NumberLiteral"]: function (parent, expr: any) {
         return `${expr.number}`
     },
-    ["StringLiteral"]: function (this, expr: any) {
+    ["StringLiteral"]: function (parent, expr: any) {
         return `"${expr.value}"`
     },
-    ["VariableDeclarationStatement"]: function (this, expr: any) {
-        return `let ${expr.variables.map(this.TS).join(" ")} = ${this.TS(expr.initialValue)};`
+    ["VariableDeclarationStatement"]: function (parent, expr: any) {
+        return `let ${expr.variables.map((vars) => TS(parent, vars)).join(" ")} ${TS(parent, expr.initialValue)};`
     },
-    ["VariableDeclaration"]: function (this, expr: any) {
+    ["VariableDeclaration"]: function (parent, expr: any) {
 
         const varDeclrOnType = (() => {
             if (expr.typeName.type === "Mapping") {
+                // console.log("map", expr)
+                // console.log(expr)
+                parent.contractsData[parent.currentContractName].mappingVariables[expr.name] = true
+
                 return `new Map<${getTypeByName(expr.typeName.keyType.name)()}, ${getTypeByName(expr.typeName.valueType.name)()}>()`
             }
 
@@ -57,54 +63,88 @@ const expressionDefinitions: ExpressionDefinitions = {
 
         return `${expr.name} = ${varDeclrOnType}`
     },
-    ["IfStatement"]: function (this, expr: any) {
-        let str = `if (${this.TS(expr.condition)}) ${this.TS(expr.trueBody)}`
+    ["IfStatement"]: function (parent, expr: any) {
+        let str = `if (${TS(parent, expr.condition)}) ${TS(parent, expr.trueBody)}`
 
         if (expr.falseBody !== null) {
-            str += `else ${this.TS(expr.falseBody)}`
+            str += `else ${TS(parent, expr.falseBody)}`
         }
 
         return str
     },
-    ["BinaryOperation"]: function (this, expr: any) {
-        return `${this.TS(expr.left)} ${expr.operator} ${this.TS(expr.right)}`
+    ["BinaryOperation"]: function (parent, expr: any) {
+
+        if (expr.left.type === "IndexAccess" && expr.operator === "=") {
+            const mapExists = parent.contractsData[parent.currentContractName].mappingVariables[expr.left.base.name]
+
+            if (mapExists === undefined || !mapExists) {
+                throw new Error(`Mapping with the name ${expr.left.base.name} isn't present in the contract ${parent.currentContractName}`)
+            }
+
+            return `this.${expr.left.base.name}.set(${TS(parent, expr.left.index)}, ${TS(parent, expr.right)})`
+        }
+
+        if (expr.left.type === "Identifier") {
+            return `${TS(parent, expr.left)} ${expr.operator} ${TS(parent, expr.right)};`
+        }
+
+        return `${TS(parent, expr.left)} ${expr.operator} ${TS(parent, expr.right)}`
     },
-    ["WhileStatement"]: function (this, expr: any) {
-        return `while (${this.TS(expr.condition)}) ${this.TS(expr.body)}`
+    ["WhileStatement"]: function (parent, expr: any) {
+        return `while (${TS(parent, expr.condition)}) ${TS(parent, expr.body)}`
     },
-    ["ForStatement"]: function (this, expr: any) {
-        return `for (${this.TS(expr.initExpression)} ${this.TS(expr.conditionExpression)} ; ${this.TS(expr.loopExpression)}) ${this.TS(expr.body)}`
+    ["ForStatement"]: function (parent, expr: any) {
+        return `for (${TS(parent, expr.initExpression)} ${TS(parent, expr.conditionExpression)} ; ${TS(parent, expr.loopExpression)}) ${TS(parent, expr.body)}`
     },
-    ["Identifier"]: function (this, expr: any) {
+    ["Identifier"]: function (parent, expr: any) {
+        const variableExists = parent.contractsData[parent.currentContractName].variables[expr.name]
+
+        if (variableExists !== undefined || variableExists) {
+            return `this.${expr.name}`
+        }
+
         return `${expr.name}`
     },
-    ["ExpressionStatement"]: function (this, expr: any) {
-        return `${this.TS(expr.expression)}`
+    ["ExpressionStatement"]: function (parent, expr: any) {
+
+        return `${TS(parent, expr.expression)}`
     },
-    ["UnaryOperation"]: function (this, expr: any) {
-        return `${this.TS(expr.subExpression)}${expr.operator}`
+    ["UnaryOperation"]: function (parent, expr: any) {
+        return `${TS(parent, expr.subExpression)}${expr.operator}`
     },
-    ["NewExpression"]: function (this, expr: any) {
-        return `new ${this.TS(expr.typeName)}`
+    ["NewExpression"]: function (parent, expr: any) {
+        return `new ${TS(parent, expr.typeName)}`
     },
-    ["ReturnStatement"]: function (this, expr: any) {
-        return `return ${this.TS(expr.expression)};`
+    ["ReturnStatement"]: function (parent, expr: any) {
+
+        return `return ${TS(parent, expr.expression)};`
     },
-    ["MemberAccess"]: function (this, expr: any) {
-        return `${this.TS(expr.expression)}.${expr.memberName}`
+    ["MemberAccess"]: function (parent, expr: any) {
+        return `${TS(parent, expr.expression)}.${expr.memberName}`
     },
-    ["FunctionCall"]: function (this, expr: any) {
-        return ` ${this.TS(expr.expression)}(${expr.arguments.map(this.TS).join(",")})`
+    ["FunctionCall"]: function (parent, expr: any) {
+        return ` ${TS(parent, expr.expression)}(${expr.arguments.map((arg) => TS(parent, arg)).join(",")})`
     },
-    ["ArrayTypeName"]: function (this, expr: any) {
+    ["ArrayTypeName"]: function (parent, expr: any) {
         return `Array`
     },
-    ["Mapping"]: function (this, expr: any) {
+    ["IndexAccess"]: function (parent, expr: any) {
+        console.log("index:", expr)
+
+        const mapExists = parent.contractsData[parent.currentContractName].mappingVariables[expr.base.name]
+
+        if (mapExists !== undefined || mapExists) {
+            return `this.${expr.base.name}.get(${TS(parent, expr.index)})`
+        }
+
+        return `TODO//`
+    },
+    ["Mapping"]: function (parent, expr: any) {
 
         return ``
     },
-    ["TupleExpression"]: function (this, expr: any) {
-        return `[${expr.components.map(this.TS).toString()}]`
+    ["TupleExpression"]: function (parent, expr: any) {
+        return `[${expr.components.map(TS).toString()}]`
     },
 }
 
