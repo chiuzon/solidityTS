@@ -2,12 +2,31 @@ import * as exp from "constants"
 import { ExpressionDefinitions } from "./type"
 import { logInfo } from "./utils"
 
+const elementaryTypeAlias = {
+    ["address"]: (type) => { return 'string' },
+    ["uint"]: (type) => { return 'number' }
+}
+
+function getTypeByName(name: string) {
+    const typeDecl = elementaryTypeAlias[name]
+
+    if (typeDecl === undefined) {
+        throw new Error("Type Not Supported!")
+    }
+
+    return typeDecl
+}
+
 const expressionDefinitions: ExpressionDefinitions = {
     ["ContractDefinition"]: function (this, expr: any) {
         return `class ${expr.name} { ${expr.subNodes.map(this.TS).join(" ")} }`
     },
     ["StateVariableDeclaration"]: function (this, expr: any) {
-        return `${expr.variables.map(this.TS).join(" ")} = ${this.TS(expr.initialValue)};`
+
+
+        const initialValue = expr.initialValue === null ? "" : this.TS(expr.initialValue)
+
+        return `${expr.variables.map(this.TS).join(" ")} ${initialValue};`
     },
     ["Block"]: function (this, expr: any) {
         return `{ ${expr.statements.map(this.TS).join(" ")} }`
@@ -27,9 +46,16 @@ const expressionDefinitions: ExpressionDefinitions = {
         return `let ${expr.variables.map(this.TS).join(" ")} = ${this.TS(expr.initialValue)};`
     },
     ["VariableDeclaration"]: function (this, expr: any) {
-        // // TODO: Add typing support
-        // console.log(expr)
-        return `${expr.name}`
+
+        const varDeclrOnType = (() => {
+            if (expr.typeName.type === "Mapping") {
+                return `new Map<${getTypeByName(expr.typeName.keyType.name)()}, ${getTypeByName(expr.typeName.valueType.name)()}>()`
+            }
+
+            return ""
+        })()
+
+        return `${expr.name} = ${varDeclrOnType}`
     },
     ["IfStatement"]: function (this, expr: any) {
         let str = `if (${this.TS(expr.condition)}) ${this.TS(expr.trueBody)}`
@@ -72,6 +98,10 @@ const expressionDefinitions: ExpressionDefinitions = {
     },
     ["ArrayTypeName"]: function (this, expr: any) {
         return `Array`
+    },
+    ["Mapping"]: function (this, expr: any) {
+
+        return ``
     },
     ["TupleExpression"]: function (this, expr: any) {
         return `[${expr.components.map(this.TS).toString()}]`
