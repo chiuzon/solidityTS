@@ -81,7 +81,7 @@ const expressionDefinitions: ExpressionDefinitions = {
                 throw new Error(`Mapping with the name ${expr.left.base.name} isn't present in the contract ${parent.currentContractName}`)
             }
 
-            return `this.${expr.left.base.name}.set(${TS(parent, expr.left.index)}, ${TS(parent, expr.right)})`
+            return `this.${expr.left.base.name}.set(${TS(parent, expr.left.index)}, ${TS(parent, expr.right)});`
         }
 
         if (expr.left.type === "Identifier") {
@@ -123,13 +123,12 @@ const expressionDefinitions: ExpressionDefinitions = {
         return `${TS(parent, expr.expression)}.${expr.memberName}`
     },
     ["FunctionCall"]: function (parent, expr: any) {
-        return ` ${TS(parent, expr.expression)}(${expr.arguments.map((arg) => TS(parent, arg)).join(",")})`
+        return ` ${TS(parent, expr.expression)}(${expr.arguments.map((arg) => TS(parent, arg)).join(",")});`
     },
     ["ArrayTypeName"]: function (parent, expr: any) {
         return `Array`
     },
     ["IndexAccess"]: function (parent, expr: any) {
-        console.log("index:", expr)
 
         const mapExists = parent.contractsData[parent.currentContractName].mappingVariables[expr.base.name]
 
@@ -137,14 +136,14 @@ const expressionDefinitions: ExpressionDefinitions = {
             return `this.${expr.base.name}.get(${TS(parent, expr.index)})`
         }
 
-        return `TODO//`
+        return `${TS(parent, expr.base)}[${TS(parent, expr.index)}]`
     },
     ["Mapping"]: function (parent, expr: any) {
 
         return ``
     },
     ["TupleExpression"]: function (parent, expr: any) {
-        return `[${expr.components.map(TS).toString()}]`
+        return `[${expr.components.map((el) => TS(parent, el)).toString()}]`
     },
 }
 

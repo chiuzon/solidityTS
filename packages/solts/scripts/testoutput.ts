@@ -3,16 +3,19 @@ import SolTS from "../src/main";
 
 const solCode = new SolTS(`
     contract Test {
-        uint i = 100;
+        uint[] i = [10, 20, 30];
+        mapping(address => uint) x;
 
        function test() {
-            uint a = 10;
+           console.log(i[0]);
 
-            i = 100;
+           i.push(10);
 
-            a = 10;
+           x["0x1"] = 10;
+
+           console.log(x["0x1"]);
        }
     }
 `)
 
-solCode.transpile()
+solCode.exec()

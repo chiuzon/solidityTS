@@ -17,6 +17,8 @@ export interface ContractData {
 export function TS(parent: TranspileToTS, exp: any): string {
     const expFunc = expressionDefinitions[exp.type]
 
+    // console.log(exp)
+
     if (expFunc === undefined) {
         throw new Error(`Expression unknown (${exp.type})`)
     }
@@ -31,16 +33,6 @@ export class TranspileToTS {
     currentContractName = ""
 
     constructor() { }
-
-    static TS(parent: TranspileToTS, exp: any): string {
-        const expFunc = expressionDefinitions[exp.type]
-
-        if (expFunc === undefined) {
-            throw new Error(`Expression unknown (${exp.type})`)
-        }
-
-        return expFunc(parent, exp)
-    }
 
     SolTS(exp: any): string {
         return exp.children.map((data) => {
@@ -81,6 +73,12 @@ class SolTS {
         this.#transpiledCode = _transpiled
 
         console.log('[output]', this.#transpiledCode)
+    }
+
+    exec() {
+        this.transpile()
+
+        // eval(this.#transpiledCode)
     }
 
     expose() {
