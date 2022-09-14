@@ -1,3 +1,4 @@
+import * as exp from "constants"
 import { ExpressionDefinitions } from "./type"
 import { logInfo } from "./utils"
 
@@ -26,8 +27,8 @@ const expressionDefinitions: ExpressionDefinitions = {
         return `let ${expr.variables.map(this.TS).join(" ")} = ${this.TS(expr.initialValue)};`
     },
     ["VariableDeclaration"]: function (this, expr: any) {
-        // TODO: Add typing support
-
+        // // TODO: Add typing support
+        // console.log(expr)
         return `${expr.name}`
     },
     ["IfStatement"]: function (this, expr: any) {
@@ -69,8 +70,13 @@ const expressionDefinitions: ExpressionDefinitions = {
     ["FunctionCall"]: function (this, expr: any) {
         return ` ${this.TS(expr.expression)}(${expr.arguments.map(this.TS).join(",")})`
     },
+    ["ArrayTypeName"]: function (this, expr: any) {
+        return `Array`
+    },
+    ["TupleExpression"]: function (this, expr: any) {
+        return `[${expr.components.map(this.TS).toString()}]`
+    },
 }
 
-//
 
 export default expressionDefinitions

@@ -1,10 +1,11 @@
 import expressionDefinitions from "./expressionMakers";
 
 import * as solidityParse from "@solidity-parser/parser"
+import { logInfo } from "./utils";
 
 export class TranspileToTS {
     static TS(exp: any): string {
-        // console.log(exp)
+        logInfo(exp)
 
         const expFunc = expressionDefinitions[exp.type]
 
