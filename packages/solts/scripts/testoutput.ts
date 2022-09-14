@@ -5,6 +5,10 @@ const solCode = new SolTS(`
     contract Test {
         uint i = 10;
 
+        constructor() {
+            
+        }
+
         function test() public {
             uint x = "1";
 

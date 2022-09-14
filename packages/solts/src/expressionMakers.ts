@@ -12,7 +12,9 @@ const expressionDefinitions: ExpressionDefinitions = {
         return `{ ${expr.statements.map(this.TS).join(" ")} }`
     },
     ["FunctionDefinition"]: function (this, expr: any) {
-        return `${expr.name} (${expr.parameters.map((par: any) => `${par.name}`).join(",")}) ${this.TS(expr.body)}`
+        const funcName = expr.name === null ? "constructor" : expr.name
+
+        return `${funcName} (${expr.parameters.map((par: any) => `${par.name}`).join(",")}) ${this.TS(expr.body)}`
     },
     ["NumberLiteral"]: function (this, expr: any) {
         return `${expr.number}`
